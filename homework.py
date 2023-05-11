@@ -72,7 +72,7 @@ def get_api_answer(current_timestamp):
                 f'ошибка: {homework_statuses.status_code}'
                 f'причина: {homework_statuses.reason}'
                 f'текст: {homework_statuses.text}')
-        
+
         last_timestamp = int(time.time())
 
         return homework_statuses.json()
