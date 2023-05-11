@@ -20,3 +20,7 @@ class EmptyResponseFromAPI(NotForSending):
 
 class TelegramError(NotForSending):
     pass
+
+
+class APIResponseError(Exception):
+    pass

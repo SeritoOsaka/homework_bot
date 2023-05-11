@@ -1,13 +1,14 @@
-import telegram
-import time
-import requests
 import logging
-import sys
 import os
-import exceptions
-
-from dotenv import load_dotenv
+import sys
+import time
 from http import HTTPStatus
+
+import requests
+import telegram
+from dotenv import load_dotenv
+
+import exceptions
 
 load_dotenv()
 
@@ -19,12 +20,13 @@ RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
-
 HOMEWORK_VERDICTS = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
+
+last_timestamp = None
 
 
 def check_tokens():
@@ -49,11 +51,14 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Получить статус домашней работы."""
-    timestamp = current_timestamp or int(time.time())
+    global last_timestamp
+    current_timestamp = int(time.time())
+    if last_timestamp:
+        current_timestamp = last_timestamp
     params_request = {
         'url': ENDPOINT,
         'headers': HEADERS,
-        'params': {'from_date': timestamp},
+        'params': {'from_date': current_timestamp},
     }
     try:
         logging.info(
@@ -67,6 +72,9 @@ def get_api_answer(current_timestamp):
                 f'ошибка: {homework_statuses.status_code}'
                 f'причина: {homework_statuses.reason}'
                 f'текст: {homework_statuses.text}')
+        
+        last_timestamp = int(time.time())
+
         return homework_statuses.json()
     except Exception:
         raise exceptions.ConnectingError(
@@ -92,15 +100,15 @@ def parse_status(homework):
 
 
 def check_response(response):
-    """Проверить валидность ответа."""
-    logging.debug('Начало проверки')
+    """Проверяет ответ API на корректность."""
+    logging.info('Проверка ответа от API')
     if not isinstance(response, dict):
-        raise TypeError('Ошибка в типе ответа API')
+        raise TypeError('Ответ API не является словарем')
     if 'homeworks' not in response or 'current_date' not in response:
-        raise exceptions.EmptyResponseFromAPI('Пустой ответ от API')
-    homeworks = response.get('homeworks')
+        raise KeyError('Отсутствует ключ')
+    homeworks = response['homeworks']
     if not isinstance(homeworks, list):
-        raise TypeError('homeworks не является списком')
+        raise TypeError('Ответ API не является листом')
     return homeworks
 
 
@@ -150,17 +158,17 @@ def main():
                 send_message(bot, message)
                 prev_report = current_report.copy
         finally:
+            current_timestamp = response.get('current_date')
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.INFO,
-        format=(
-            '%(asctime)s, %(levelname)s, Путь - %(pathname)s, '
-            'Файл - %(filename)s, Функция - %(funcName)s, '
-            'Номер строки - %(lineno)d, %(message)s'
-        ),
-        handlers=[logging.FileHandler('log.txt', encoding='UTF-8'),
-                  logging.StreamHandler(sys.stdout)])
+        filename='homework.log',
+        format='%(asctime)s, %(levelname)s, %(name)s, %(message)s')
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler(stream=sys.stdout)
+    logger.addHandler(handler)
     main()
