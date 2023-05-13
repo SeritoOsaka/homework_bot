@@ -24,3 +24,7 @@ class TelegramError(NotForSending):
 
 class APIResponseError(Exception):
     pass
+
+
+class InvalidResponseFormat(Exception):
+    pass

@@ -26,8 +26,6 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-last_timestamp = None
-
 
 def check_tokens():
     """Проверка доступности переменных окружения."""
@@ -43,7 +41,7 @@ def send_message(bot, message):
             text=message,
         )
     except telegram.TelegramError as error:
-        raise f'Не удалось отправить сообщение {error}'
+        raise Exception(f'Не удалось отправить сообщение {error}')
     else:
         logging.debug(f'Сообщение отправлено {message}')
 
@@ -60,24 +58,21 @@ def get_api_answer(current_timestamp):
             'Начало запроса: url = {url},'
             'headers = {headers},'
             'params = {params}'.format(**params_request))
-        homework_verdicts = requests.get(**params_request)
-        if homework_verdicts.status_code != HTTPStatus.OK:
+        homework_statuses = requests.get(**params_request)
+        if homework_statuses.status_code != HTTPStatus.OK:
             raise exceptions.InvalidResponseCode(
                 'Не удалось получить ответ API, '
-                f'ошибка: {homework_verdicts.status_code}'
-                f'причина: {homework_verdicts.reason}'
-                f'текст: {homework_verdicts.text}')
-
-        current_timestamp = int(time.time())
-
-        verdict = homework_verdicts.json().get('verdict')
-        if verdict:
-            if verdict in HOMEWORK_VERDICTS:
-                send_message(HOMEWORK_VERDICTS[verdict])
-            else:
-                logging.warning(f'Неизвестный вердикт: {verdict}')
-
-        return homework_verdicts.json()
+                f'ошибка: {homework_statuses.status_code}'
+                f'причина: {homework_statuses.reason}'
+                f'текст: {homework_statuses.text}')
+        try:
+            return homework_statuses.json()
+        except ValueError as e:
+            raise exceptions.InvalidResponseFormat(
+                'Ошибка декодирования ответа API: {error}. '
+                'Полученный ответ: {response}'.format(
+                    error=str(e),
+                    response=homework_statuses.text))
     except requests.RequestException as e:
         raise exceptions.ConnectingError(
             'Не верный код ответа параметры запроса: url = {url},'
@@ -93,7 +88,7 @@ def parse_status(homework):
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_VERDICTS:
         raise ValueError(f'Неизвестный статус работы - {homework_status}')
-    return(
+    return (
         'Изменился статус проверки работы "{homework_name}" {verdict}'
     ).format(
         homework_name=homework_name,
@@ -109,7 +104,7 @@ def check_response(response):
     if 'homeworks' not in response:
         raise KeyError('Отсутствует ключ "homeworks" в ответе API')
     if 'current_date' not in response:
-        raise KeyError('Отсутствует ключ "current_date" в ответе API')
+        logging.error('Отсутствует ключ "current_date" в ответе API')
     homeworks = response['homeworks']
     if not isinstance(homeworks, list):
         raise TypeError('Значение ключа "homeworks" должно быть списком')
@@ -132,9 +127,9 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
+            new_homeworks = check_response(response)
             current_timestamp = response.get(
                 'current_data', current_timestamp)
-            new_homeworks = check_response(response)
             if new_homeworks:
                 homework = new_homeworks[0]
                 homework_status = homework.get('status')
