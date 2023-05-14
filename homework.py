@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -41,7 +42,9 @@ def send_message(bot, message):
             text=message,
         )
     except telegram.TelegramError as error:
-        raise Exception(f'Не удалось отправить сообщение {error}')
+        error_message = f'Не удалось отправить сообщение: {error}'
+        logging.error(error_message)
+        raise exceptions.MessageNotSend(error_message)
     else:
         logging.debug(f'Сообщение отправлено {message}')
 
@@ -67,7 +70,7 @@ def get_api_answer(current_timestamp):
                 f'текст: {homework_statuses.text}')
         try:
             return homework_statuses.json()
-        except ValueError as e:
+        except json.JSONDecodeError as e:
             raise exceptions.InvalidResponseFormat(
                 'Ошибка декодирования ответа API: {error}. '
                 'Полученный ответ: {response}'.format(
@@ -75,15 +78,20 @@ def get_api_answer(current_timestamp):
                     response=homework_statuses.text))
     except requests.RequestException as e:
         raise exceptions.ConnectingError(
-            'Не верный код ответа параметры запроса: url = {url},'
+            'Ошибка запроса к API: {error}. '
+            'Параметры запроса: url = {url},'
             'headers = {headers},'
-            'params = {params}'.format(**params_request)) from e
+            'params = {params}'.format(
+                error=str(e),
+                **params_request)) from e
 
 
 def parse_status(homework):
     """Распарсить ответ."""
     if 'homework_name' not in homework:
         raise KeyError('В ответе отсутсвует ключ homework_name')
+    if 'status' not in homework:
+        raise KeyError('В ответе отсутствует ключ status')
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_VERDICTS:
@@ -103,8 +111,6 @@ def check_response(response):
         raise TypeError('Ответ API должен быть словарем')
     if 'homeworks' not in response:
         raise KeyError('Отсутствует ключ "homeworks" в ответе API')
-    if 'current_date' not in response:
-        logging.error('Отсутствует ключ "current_date" в ответе API')
     homeworks = response['homeworks']
     if not isinstance(homeworks, list):
         raise TypeError('Значение ключа "homeworks" должно быть списком')
@@ -132,12 +138,12 @@ def main():
                 'current_data', current_timestamp)
             if new_homeworks:
                 homework = new_homeworks[0]
-                homework_status = homework.get('status')
-                if homework_status in HOMEWORK_VERDICTS:
-                    homework_verdict = HOMEWORK_VERDICTS[homework_status]
+                homework_verdict = HOMEWORK_VERDICTS.get(
+                    homework.get('status'))
+                if homework_verdict:
                     current_report['output'] = homework_verdict
                 else:
-                    current_report['output'] = homework_status
+                    current_report['output'] = homework.get('status')
             else:
                 current_report['output'] = 'Нет новых статусов работ.'
             if current_report != prev_report:
@@ -157,8 +163,9 @@ def main():
                 send_message(bot, message)
                 prev_report = current_report.copy
         finally:
-            current_timestamp = response.get('current_date')
             time.sleep(RETRY_PERIOD)
+            if 'current_date' not in response:
+                logging.warning('Отсутствует ключ "current_date" в ответе API')
 
 
 if __name__ == '__main__':

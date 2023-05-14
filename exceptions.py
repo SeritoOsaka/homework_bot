@@ -28,3 +28,7 @@ class APIResponseError(Exception):
 
 class InvalidResponseFormat(Exception):
     pass
+
+
+class MessageNotSend(Exception):
+    pass
