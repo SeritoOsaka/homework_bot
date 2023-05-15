@@ -32,3 +32,7 @@ class InvalidResponseFormat(Exception):
 
 class MessageNotSend(Exception):
     pass
+
+
+class MissingCurrentDateError(KeyError):
+    pass

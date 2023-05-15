@@ -44,7 +44,6 @@ def send_message(bot, message):
     except telegram.TelegramError as error:
         error_message = f'Не удалось отправить сообщение: {error}'
         logging.error(error_message)
-        raise exceptions.MessageNotSend(error_message)
     else:
         logging.debug(f'Сообщение отправлено {message}')
 
@@ -68,14 +67,13 @@ def get_api_answer(current_timestamp):
                 f'ошибка: {homework_statuses.status_code}'
                 f'причина: {homework_statuses.reason}'
                 f'текст: {homework_statuses.text}')
-        try:
-            return homework_statuses.json()
-        except json.JSONDecodeError as e:
-            raise exceptions.InvalidResponseFormat(
-                'Ошибка декодирования ответа API: {error}. '
-                'Полученный ответ: {response}'.format(
-                    error=str(e),
-                    response=homework_statuses.text))
+        return homework_statuses.json()
+    except json.JSONDecodeError as e:
+        raise exceptions.InvalidResponseFormat(
+            'Ошибка декодирования ответа API: {error}. '
+            'Полученный ответ: {response}'.format(
+                error=str(e),
+                response=homework_statuses.text))
     except requests.RequestException as e:
         raise exceptions.ConnectingError(
             'Ошибка запроса к API: {error}. '
@@ -112,6 +110,9 @@ def check_response(response):
     if 'homeworks' not in response:
         raise KeyError('Отсутствует ключ "homeworks" в ответе API')
     homeworks = response['homeworks']
+    if 'current_date' not in response:
+        raise exceptions.MissingCurrentDateError(
+            'Отсутствует ключ "current_date" в ответе API')
     if not isinstance(homeworks, list):
         raise TypeError('Значение ключа "homeworks" должно быть списком')
     return homeworks
@@ -164,8 +165,7 @@ def main():
                 prev_report = current_report.copy
         finally:
             time.sleep(RETRY_PERIOD)
-            if 'current_date' not in response:
-                logging.warning('Отсутствует ключ "current_date" в ответе API')
+            logging.error('Отсутствует ключ "current_date" в ответе API')
 
 
 if __name__ == '__main__':
