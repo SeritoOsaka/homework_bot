@@ -14,18 +14,6 @@ class ConnectingError(Exception):
     pass
 
 
-class EmptyResponseFromAPI(NotForSending):
-    pass
-
-
-class TelegramError(NotForSending):
-    pass
-
-
-class APIResponseError(Exception):
-    pass
-
-
 class InvalidResponseFormat(Exception):
     pass
 
@@ -34,5 +22,5 @@ class MessageNotSend(Exception):
     pass
 
 
-class MissingCurrentDateError(KeyError):
+class MissingCurrentDateError(NotForSending):
     pass

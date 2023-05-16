@@ -113,6 +113,9 @@ def check_response(response):
     if 'current_date' not in response:
         raise exceptions.MissingCurrentDateError(
             'Отсутствует ключ "current_date" в ответе API')
+    current_date = response['current_date']
+    if not isinstance(current_date, int):
+        raise TypeError('Значение ключа "current_date" должно быть числом')
     if not isinstance(homeworks, list):
         raise TypeError('Значение ключа "homeworks" должно быть списком')
     return homeworks
@@ -121,8 +124,7 @@ def check_response(response):
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        logging.critical('Отсутствует необходимое кол-во'
-                         ' переменных окружения')
+        logging.critical('Отсутствует необходимое кол-во переменных окружения')
         sys.exit('Отсутствуют переменные окружения')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
@@ -135,20 +137,15 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             new_homeworks = check_response(response)
-            current_timestamp = response.get(
-                'current_data', current_timestamp)
+            current_timestamp = response.get('current_data', current_timestamp)
             if new_homeworks:
                 homework = new_homeworks[0]
-                homework_verdict = HOMEWORK_VERDICTS.get(
-                    homework.get('status'))
-                if homework_verdict:
-                    current_report['output'] = homework_verdict
-                else:
-                    current_report['output'] = homework.get('status')
+                report_output = parse_status(homework)
+                current_report['output'] = report_output
             else:
                 current_report['output'] = 'Нет новых статусов работ.'
             if current_report != prev_report:
-                send = f' {current_report["name"]}, {current_report["output"]}'
+                send = f'{current_report["name"]}, {current_report["output"]}'
                 send_message(bot, send)
                 prev_report = current_report.copy()
             else:
@@ -162,7 +159,7 @@ def main():
             logging.error(message)
             if current_report != prev_report:
                 send_message(bot, message)
-                prev_report = current_report.copy
+                prev_report = current_report.copy()
         finally:
             time.sleep(RETRY_PERIOD)
             logging.error('Отсутствует ключ "current_date" в ответе API')
