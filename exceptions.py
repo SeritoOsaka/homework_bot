@@ -2,10 +2,6 @@ class NotForSending(Exception):
     pass
 
 
-class ProblemDescriptions(Exception):
-    pass
-
-
 class InvalidResponseCode(Exception):
     pass
 
