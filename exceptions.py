@@ -14,9 +14,9 @@ class InvalidResponseFormat(Exception):
     pass
 
 
-class MessageNotSend(Exception):
+class MissingCurrentDateError(NotForSending):
     pass
 
 
-class MissingCurrentDateError(NotForSending):
+class CurrentDateError(NotForSending):
     pass

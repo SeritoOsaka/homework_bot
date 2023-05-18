@@ -115,7 +115,8 @@ def check_response(response):
             'Отсутствует ключ "current_date" в ответе API')
     current_date = response['current_date']
     if not isinstance(current_date, int):
-        raise TypeError('Значение ключа "current_date" должно быть числом')
+        raise exceptions.CurrentDateError(
+            'Значение ключа "current_date" должно быть числом')
     if not isinstance(homeworks, list):
         raise TypeError('Значение ключа "homeworks" должно быть списком')
     return homeworks
